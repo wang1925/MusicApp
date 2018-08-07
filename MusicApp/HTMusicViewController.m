@@ -24,9 +24,10 @@
 @property (nonatomic, strong) AVPlayer *player;
 @property (nonatomic, strong) UITableView *tableView;
 @property (nonatomic, strong) HTControlView *controlView;
+@property (nonatomic, assign) NSInteger songIndex;
+@property (nonatomic, strong) NSMutableArray *songArr;
 //歌词数组
 @property (nonatomic, strong) NSMutableArray *lrcArray;
-
 //当前歌词所在位置
 @property (nonatomic,assign)  NSInteger currentRow;
 //用来显示锁屏歌词
@@ -41,16 +42,40 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.view.backgroundColor = [UIColor whiteColor];
+    self.songIndex = 0;
     
-    [self getLrcArray];
+//    [self getLrcArray];
     [self configUI];
-    
-    [self.player play];
+    [self configPlayer];
+//    [self.player play];
     self.controlView.playBtn.selected = YES;
     
     [self configBackgroundAudioSetting];
-    [self createRemoteCommandCenterStyleCustom];
+    [self createRemoteCommandCenterStyleNormal];
+}
+#pragma mark- Player
+- (void)configPlayer{
+    [self getLrcArray];
+    
+    NSDictionary *currentSong = self.songArr[self.songIndex];
+    self.title = currentSong[@"name"];
+    
+    NSString *pathStr = [[NSBundle mainBundle] pathForResource:currentSong[@"name"] ofType:@"mp3"];
+    self.player = [[AVPlayer alloc] initWithURL:[NSURL fileURLWithPath:pathStr]];
+    
+    [self.player play];
     [self playControlAndObserver];
+}
+//获得歌词数组
+- (void)getLrcArray{
+    NSDictionary *currentSong = self.songArr[self.songIndex];
+    
+    wslAnalyzer *analyzer = [[wslAnalyzer alloc] init];
+    NSString *pathStr = [[NSBundle mainBundle] pathForResource:currentSong[@"name"] ofType:@"txt"];
+    self.lrcArray = [analyzer analyzerLrcBylrcString:[NSString stringWithContentsOfFile:pathStr encoding:NSUTF8StringEncoding error:nil]];
+    
+    self.currentRow = 0;
+    [self.tableView reloadData];
 }
 #pragma mark- UI
 - (void)configUI{
@@ -164,10 +189,12 @@
     }];
     [commandCenter.previousTrackCommand addTargetWithHandler:^MPRemoteCommandHandlerStatus(MPRemoteCommandEvent * _Nonnull event) {
         NSLog(@"上一首");
+        [self controlPreviousAction:nil];
         return MPRemoteCommandHandlerStatusSuccess;
     }];
     [commandCenter.nextTrackCommand addTargetWithHandler:^MPRemoteCommandHandlerStatus(MPRemoteCommandEvent * _Nonnull event) {
         NSLog(@"下一首");
+        [self controlNextAction:nil];
         return MPRemoteCommandHandlerStatusSuccess;
     }];
     
@@ -187,7 +214,10 @@
 - (void)createRemoteCommandCenterStyleCustom{
     MPRemoteCommandCenter *commandCenter = [MPRemoteCommandCenter sharedCommandCenter];
     
-    [self setFeedbackCommand:commandCenter];
+//    [self setSkipCommand:commandCenter];
+//    [self setFeedbackCommand:commandCenter];
+    [self setRatingCommand:commandCenter];
+//    [self setPlayBackRateCommand:commandCenter];
     
     [commandCenter.pauseCommand addTargetWithHandler:^MPRemoteCommandHandlerStatus(MPRemoteCommandEvent * _Nonnull event) {
         [self.player pause];
@@ -197,43 +227,55 @@
         [self.player play];
         return MPRemoteCommandHandlerStatusSuccess;
     }];
-    [commandCenter.nextTrackCommand addTargetWithHandler:^MPRemoteCommandHandlerStatus(MPRemoteCommandEvent * _Nonnull event) {
-        NSLog(@"下一首");
-        return MPRemoteCommandHandlerStatusSuccess;
-    }];
-    
-    //在控制台拖动进度条调节进度（仿QQ音乐的效果）
-    if (@available(iOS 9.1, *)) {
-        [commandCenter.changePlaybackPositionCommand addTargetWithHandler:^MPRemoteCommandHandlerStatus(MPRemoteCommandEvent * _Nonnull event) {
-            CMTime totlaTime = self.player.currentItem.duration;
-            MPChangePlaybackPositionCommandEvent * playbackPositionEvent = (MPChangePlaybackPositionCommandEvent *)event;
-            [self.player seekToTime:CMTimeMake(totlaTime.value*playbackPositionEvent.positionTime/CMTimeGetSeconds(totlaTime), totlaTime.timescale) completionHandler:^(BOOL finished) {
-            }];
-            return MPRemoteCommandHandlerStatusSuccess;
-        }];
-    } else {
-        // Fallback on earlier versions
-    }
 }
-// Feedback列表
--(void)setFeedbackCommand:(MPRemoteCommandCenter *)rcc{
-    MPFeedbackCommand *likeCommand = [rcc likeCommand];
+#pragma mark- 快进 Skip Forward&Backward
+-(void)setSkipCommand:(MPRemoteCommandCenter *)commandCenter{
+    MPSkipIntervalCommand *skipForwardIntervalCommand = [commandCenter skipForwardCommand];
+    skipForwardIntervalCommand.preferredIntervals = @[@(15)];  // 快进 最大 99
+    [skipForwardIntervalCommand setEnabled:YES];
+    [skipForwardIntervalCommand addTarget:self action:@selector(skipForwardEvent:)];
+    
+    MPSkipIntervalCommand *skipBackwardIntervalCommand = [commandCenter skipBackwardCommand];
+    [skipBackwardIntervalCommand setEnabled:YES];
+    [skipBackwardIntervalCommand addTarget:self action:@selector(skipBackwardEvent:)];
+    skipBackwardIntervalCommand.preferredIntervals = @[@(15)];  // 快退
+}
+-(void)skipForwardEvent:(MPSkipIntervalCommandEvent *)skipEvent{
+    NSLog(@"快进了 %f秒", skipEvent.interval);
+    
+    CMTime totlaTime = self.player.currentItem.duration;
+    __weak __typeof(self)weakSelf = self;
+    [self.player seekToTime:CMTimeMake(totlaTime.value +skipEvent.interval, totlaTime.timescale) completionHandler:^(BOOL finished) {
+        [weakSelf.player play];
+    }];
+}
+-(void)skipBackwardEvent:(MPSkipIntervalCommandEvent *)skipEvent{
+    NSLog(@"快退了 %f秒", skipEvent.interval);
+    
+    CMTime totlaTime = self.player.currentItem.duration;
+    __weak __typeof(self)weakSelf = self;
+    [self.player seekToTime:CMTimeMake(totlaTime.value -skipEvent.interval, totlaTime.timescale) completionHandler:^(BOOL finished) {
+        [weakSelf.player play];
+    }];
+}
+#pragma mark- Feedback列表
+-(void)setFeedbackCommand:(MPRemoteCommandCenter *)commandCenter{
+    MPFeedbackCommand *likeCommand = [commandCenter likeCommand];
     [likeCommand setEnabled:YES];
     [likeCommand setLocalizedTitle:@"喜欢"];  // can leave this out for default
     [likeCommand addTarget:self action:@selector(likeEvent:)];
-    
-    MPFeedbackCommand *dislikeCommand = [rcc dislikeCommand];
+
+    MPFeedbackCommand *dislikeCommand = [commandCenter dislikeCommand];
     [dislikeCommand setEnabled:YES];
-//    [dislikeCommand setActive:YES];
-    [dislikeCommand setLocalizedTitle:@"讨厌"]; // can leave this out for default
+    [dislikeCommand setLocalizedTitle:@"不喜欢"]; // can leave this out for default
     [dislikeCommand addTarget:self action:@selector(dislikeEvent:)];
-    
+
 //    BOOL userPreviouslyIndicatedThatTheyDislikedThisItemAndIStoredThat = YES;
 //    if (userPreviouslyIndicatedThatTheyDislikedThisItemAndIStoredThat) {
 //        [dislikeCommand setActive:YES];
 //    }
-//
-    MPFeedbackCommand *bookmarkCommand = [rcc bookmarkCommand];
+
+    MPFeedbackCommand *bookmarkCommand = [commandCenter bookmarkCommand];
     [bookmarkCommand setEnabled:YES];
     [bookmarkCommand setLocalizedTitle:@"标记"]; // can leave this out for default
     [bookmarkCommand addTarget:self action:@selector(bookmarkEvent:)];
@@ -248,9 +290,9 @@
 -(void)bookmarkEvent:(MPFeedbackCommandEvent *)feedbackEvent{
     NSLog(@"标记");
 }
-// 评分 Rating
--(void)setRatingCommand:(MPRemoteCommandCenter *)rcc{
-    MPRatingCommand *ratingCommand = [rcc ratingCommand];
+#pragma mark- 评分 Rating
+-(void)setRatingCommand:(MPRemoteCommandCenter *)commandCenter{
+    MPRatingCommand *ratingCommand = [commandCenter ratingCommand];
     [ratingCommand setEnabled:YES];
     [ratingCommand setMinimumRating:0.0];
     [ratingCommand setMaximumRating:5.0];
@@ -259,9 +301,9 @@
 -(void)ratingEvent:(MPRatingCommand *)commd{
     NSLog(@"评分");
 }
-// 倍速 PlaybackRate
--(void)setPlayBackRateCommand:(MPRemoteCommandCenter *)rcc{
-    MPChangePlaybackRateCommand *playBackRateCommand = [rcc changePlaybackRateCommand];
+#pragma mark- 倍速 PlaybackRate
+-(void)setPlayBackRateCommand:(MPRemoteCommandCenter *)commandCenter{
+    MPChangePlaybackRateCommand *playBackRateCommand = [commandCenter changePlaybackRateCommand];
     [playBackRateCommand setEnabled:YES];
     [playBackRateCommand setSupportedPlaybackRates:@[@(1),@(1.5),@(2)]];
     [playBackRateCommand addTarget:self action:@selector(playbackRateEvent:)];
@@ -269,26 +311,8 @@
 -(void)playbackRateEvent:(MPChangePlaybackRateCommand*)rate{
     NSLog(@"倍速");
 }
-// 快进 Skip Forward&Backward
--(void)setSkipCommand:(MPRemoteCommandCenter *)rcc{
-    MPSkipIntervalCommand *skipForwardIntervalCommand = [rcc skipForwardCommand];
-    skipForwardIntervalCommand.preferredIntervals = @[@(15)];  // 快进 最大 99
-    [skipForwardIntervalCommand setEnabled:YES];
-    [skipForwardIntervalCommand addTarget:self action:@selector(skipForwardEvent:)];
-    
-    MPSkipIntervalCommand *skipBackwardIntervalCommand = [rcc skipBackwardCommand];
-    [skipBackwardIntervalCommand setEnabled:YES];
-    [skipBackwardIntervalCommand addTarget:self action:@selector(skipBackwardEvent:)];
-    skipBackwardIntervalCommand.preferredIntervals = @[@(15)];  // 快退
-}
--(void)skipForwardEvent:(MPSkipIntervalCommandEvent *)skipEvent{
-    NSLog(@"快进了 %f秒", skipEvent.interval);
-}
--(void)skipBackwardEvent:(MPSkipIntervalCommandEvent *)skipEvent{
-    NSLog(@"快退了 %f秒", skipEvent.interval);
-}
 
-//移除观察者
+#pragma mark- 移除观察者
 - (void)removeRemoteCommandCenterObserver{
     [self.player removeTimeObserver:_playerTimeObserver];
     _playerTimeObserver = nil;
@@ -305,13 +329,7 @@
         // Fallback on earlier versions
     }
 }
-#pragma mark -- Help Methods
-//获得歌词数组
-- (void)getLrcArray{
-    wslAnalyzer *  analyzer = [[wslAnalyzer alloc] init];
-    NSString * path = [[NSBundle mainBundle] pathForResource:SONGNAME ofType:@"txt"];
-    self.lrcArray =  [analyzer analyzerLrcBylrcString:[NSString  stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil]];
-}
+#pragma mark - Help Methods
 //在具体的控制器或其它类中捕获处理远程控制事件,当远程控制事件发生时触发该方法, 该方法属于UIResponder类，iOS 7.1 之前经常用
 - (void)remoteControlReceivedWithEvent:(UIEvent *)event{
     NSLog(@"%ld",event.type);
@@ -381,14 +399,15 @@
 //展示锁屏歌曲信息：图片、歌词、进度、演唱者
 - (void)updateLockScreenTotaltime:(float)totalTime andCurrentTime:(float)currentTime andLyricsPoster:(BOOL)isShow{
     self.controlView.sliderView.value = currentTime/totalTime;
+    NSDictionary *currentSong = self.songArr[self.songIndex];
     
-    NSMutableDictionary * songDict = [[NSMutableDictionary alloc] init];
+    NSMutableDictionary *songDict = [[NSMutableDictionary alloc] init];
     //设置歌曲题目
-    [songDict setObject:@"多幸运" forKey:MPMediaItemPropertyTitle];
+    [songDict setObject:currentSong[@"name"] forKey:MPMediaItemPropertyTitle];
     //设置歌手名
-    [songDict setObject:@"韩安旭" forKey:MPMediaItemPropertyArtist];
+    [songDict setObject:currentSong[@"artist"] forKey:MPMediaItemPropertyArtist];
     //设置专辑名
-    [songDict setObject:@"专辑名" forKey:MPMediaItemPropertyAlbumTitle];
+    [songDict setObject:currentSong[@"album"] forKey:MPMediaItemPropertyAlbumTitle];
     //设置歌曲时长
     [songDict setObject:[NSNumber numberWithDouble:totalTime]  forKey:MPMediaItemPropertyPlaybackDuration];
     //设置已经播放时长
@@ -441,9 +460,24 @@
 }
 - (void)controlPreviousAction:(UIButton *)sender{
     NSLog(@"上一曲");
+    [self.player pause];
+    [self changeSongIndexWithMode:NO];
+    [self configPlayer];
 }
 - (void)controlNextAction:(UIButton *)sender{
     NSLog(@"下一曲");
+    [self.player pause];
+    [self changeSongIndexWithMode:YES];
+    [self configPlayer];
+}
+- (void)changeSongIndexWithMode:(BOOL)next{
+    NSInteger index = self.songIndex;
+    if (next) {
+        index = self.songIndex +1 <= self.songArr.count ?self.songIndex +1 :self.songArr.count-1;
+    }else{
+        index = self.songIndex -1 > 0 ?self.songIndex -1 :0;
+    }
+    self.songIndex = index;
 }
 - (void)controlSliderBeginAction:(UISlider *)sender{
     NSLog(@"进度条滑动开始");
@@ -458,15 +492,15 @@
         [weakSelf.player play];
     }];
 }
-#pragma mark -- Getter
-- (AVPlayer *)player{
-    if (_player == nil) {
-        NSString * path = [[NSBundle mainBundle] pathForResource:SONGNAME ofType:@"mp3"];
-        _player = [[AVPlayer alloc] initWithURL:[NSURL fileURLWithPath:path]];
+#pragma mark - Getter
+- (NSMutableArray *)songArr{
+    if (_songArr == nil) {
+        NSArray *tmpArr = @[@{@"name":@"多幸运",@"artist":@"韩安旭",@"album":@"专辑名"},
+                            @{@"name":@"父亲",@"artist":@"筷子兄弟",@"album":@"专辑名"}];
+        _songArr = [NSMutableArray arrayWithArray:tmpArr];
     }
-    return _player;
+    return _songArr;
 }
-
 #pragma mark-
 - (void)dealloc{
     [self removeRemoteCommandCenterObserver];
