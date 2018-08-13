@@ -25,6 +25,7 @@
 		5A97101F21037C5900908AB1 /* backgroundImage5.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 5A97101D21037C5900908AB1 /* backgroundImage5.jpg */; };
 		5A97102221037D6200908AB1 /* HTListViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 5A97102121037D6200908AB1 /* HTListViewController.m */; };
 		5A971025210394D800908AB1 /* HTControlView.m in Sources */ = {isa = PBXBuildFile; fileRef = 5A971024210394D800908AB1 /* HTControlView.m */; };
+		845B22172121612A0005B605 /* CoreTelephony.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 845B22162121612A0005B605 /* CoreTelephony.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -75,6 +76,7 @@
 		5A97102121037D6200908AB1 /* HTListViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = HTListViewController.m; sourceTree = "<group>"; };
 		5A971023210394D800908AB1 /* HTControlView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HTControlView.h; sourceTree = "<group>"; };
 		5A971024210394D800908AB1 /* HTControlView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = HTControlView.m; sourceTree = "<group>"; };
+		845B22162121612A0005B605 /* CoreTelephony.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreTelephony.framework; path = System/Library/Frameworks/CoreTelephony.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -82,6 +84,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				845B22172121612A0005B605 /* CoreTelephony.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -109,6 +112,7 @@
 				5A970FEF21036C2B00908AB1 /* MusicAppTests */,
 				5A970FFA21036C2B00908AB1 /* MusicAppUITests */,
 				5A970FD521036C2800908AB1 /* Products */,
+				845B22152121612A0005B605 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -184,6 +188,14 @@
 				5A97101921037A1800908AB1 /* wslLrcEach.h */,
 			);
 			path = Tools;
+			sourceTree = "<group>";
+		};
+		845B22152121612A0005B605 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				845B22162121612A0005B605 /* CoreTelephony.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */

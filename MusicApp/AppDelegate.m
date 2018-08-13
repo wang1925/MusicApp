@@ -32,6 +32,9 @@
 - (void)applicationWillResignActive:(UIApplication *)application {
     // Sent when the application is about to move from active to inactive state. This can occur for certain types of temporary interruptions (such as an incoming phone call or SMS message) or when the user quits the application and it begins the transition to the background state.
     // Use this method to pause ongoing tasks, disable timers, and invalidate graphics rendering callbacks. Games should use this method to pause the game.
+    
+    // 监听通话状态
+    [self monitorTelephoneCall];
 }
 
 
@@ -48,6 +51,9 @@
 
 - (void)applicationDidBecomeActive:(UIApplication *)application {
     // Restart any tasks that were paused (or not yet started) while the application was inactive. If the application was previously in the background, optionally refresh the user interface.
+    
+    // 监听通话状态
+    [self monitorTelephoneCall];
 }
 
 
@@ -55,5 +61,20 @@
     // Called when the application is about to terminate. Save data if appropriate. See also applicationDidEnterBackground:.
 }
 
+#pragma mark- 监听通话状态
+- (void)monitorTelephoneCall{
+    self.callCenter = [[CTCallCenter alloc] init];
+    self.callCenter.callEventHandler = ^(CTCall* call) {
+        if ([call.callState isEqualToString:CTCallStateDisconnected]){
+            NSLog(@"挂断了电话咯Call has been disconnected");
+        }else if ([call.callState isEqualToString:CTCallStateConnected]){
+            NSLog(@"电话通了Call has just been connected");
+        }else if([call.callState isEqualToString:CTCallStateIncoming] ||[call.callState isEqualToString:CTCallStateDialing]){
+            NSLog(@"来电话了Call is incoming | 正在播出电话call is dialing");
+        }else{
+            NSLog(@"嘛都没做Nothing is done");
+        }
+    };
+}
 
 @end

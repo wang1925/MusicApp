@@ -44,10 +44,8 @@
     self.view.backgroundColor = [UIColor whiteColor];
     self.songIndex = 0;
     
-//    [self getLrcArray];
     [self configUI];
     [self configPlayer];
-//    [self.player play];
     self.controlView.playBtn.selected = YES;
     
     [self configBackgroundAudioSetting];
@@ -139,10 +137,10 @@
         NSInteger  eventSubtype = [notification.userInfo[@"eventSubtype"] integerValue];
         switch (eventSubtype) {
             case UIEventSubtypeRemoteControlNextTrack:
-                NSLog(@"下一首");
+                [self controlNextAction:nil];
             break;
             case UIEventSubtypeRemoteControlPreviousTrack:
-                NSLog(@"上一首");
+                [self controlPreviousAction:nil];
             break;
             case  UIEventSubtypeRemoteControlPause:
                 [self.player pause];
@@ -188,12 +186,10 @@
         return MPRemoteCommandHandlerStatusSuccess;
     }];
     [commandCenter.previousTrackCommand addTargetWithHandler:^MPRemoteCommandHandlerStatus(MPRemoteCommandEvent * _Nonnull event) {
-        NSLog(@"上一首");
         [self controlPreviousAction:nil];
         return MPRemoteCommandHandlerStatusSuccess;
     }];
     [commandCenter.nextTrackCommand addTargetWithHandler:^MPRemoteCommandHandlerStatus(MPRemoteCommandEvent * _Nonnull event) {
-        NSLog(@"下一首");
         [self controlNextAction:nil];
         return MPRemoteCommandHandlerStatusSuccess;
     }];
